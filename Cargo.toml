@@ -4,4 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-nom = { version = "7", features = [] }
+itertools = "0.12"
+nom = "7"
+strum = { version = "0.25", features = ["derive"] }
