@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use rayon::prelude::*;
 
 fn calc_combinations(input: &str, unfold: bool) -> Vec<usize> {
@@ -18,68 +19,42 @@ fn calc_combinations(input: &str, unfold: bool) -> Vec<usize> {
                 expected = vec![expected.clone(), expected.clone(), expected.clone(), expected.clone(), expected.clone()].into_iter().flatten().collect::<Vec<_>>();
             }
 
-            calc(&springs, &expected)
+            calc(&mut HashMap::new(), &springs, &expected, 0, 0,0)
         })
         .collect()
 }
 
-fn calc(springs: &str, expected: &[usize]) -> usize {
-    let mut to_check_vec = vec!["".to_string()];
-    let mut valid = 0;
+fn calc(cache: &mut HashMap<(usize, usize, usize), usize>, springs: &str, expected: &[usize], springs_pos: usize, cur_group: usize, inside_group_length: usize) -> usize {
+    if let Some(result) = cache.get(&(springs_pos, cur_group, inside_group_length)) {
+        return *result;
+    }
 
-    while let Some(to_check) = to_check_vec.pop() {
-        let actual = get_actual_groups(&to_check);
-        if to_check.len() == springs.len() {
-            if actual == expected {
-                valid += 1;
-            }
-            continue;
-        }
-        if actual.len() > expected.len() || actual.iter().zip(expected.iter()).any(|(a, e)| *a > *e) {
-            continue;
-        }
-        if actual.len() > 0 && actual[0..actual.len() - 1].iter().zip(expected[0..expected.len() - 1].iter()).any(|(a, e)| *a != *e) {
-            continue;
-        }
+    if springs_pos == springs.len() {
+        let result = if (inside_group_length == 0 && cur_group == expected.len()) || (cur_group == expected.len() - 1 && expected[cur_group] == inside_group_length) {
+            1
+        } else {
+            0
+        };
+        cache.insert((springs_pos, cur_group, inside_group_length), result);
+        return result;
+    }
 
-        if let Some(ch) = springs.chars().nth(to_check.len()) {
-            match ch {
-                '#' => to_check_vec.push(to_check.to_string() + "#"),
-                '.' => to_check_vec.push(to_check.to_string() + "."),
-                '?' => {
-                    to_check_vec.push(to_check.to_string() + "#");
-                    to_check_vec.push(to_check.to_string() + ".");
-                },
-                _ => panic!()
-            }
+    let mut result = 0;
+
+    if springs.chars().nth(springs_pos) == Some('#') || springs.chars().nth(springs_pos) == Some('?') {
+        result += calc(cache, springs, expected, springs_pos + 1, cur_group, inside_group_length + 1);
+    }
+
+    if springs.chars().nth(springs_pos) == Some('.') || springs.chars().nth(springs_pos) == Some('?') {
+        if inside_group_length == 0 {
+            result += calc(cache, springs, expected, springs_pos + 1, cur_group, 0);
+        } else if cur_group < expected.len() && expected[cur_group] == inside_group_length {
+            result += calc(cache, springs, expected, springs_pos + 1, cur_group + 1, 0);
         }
     }
 
-    valid
-}
-
-fn get_actual_groups(springs: &str) -> Vec<usize> {
-    let mut actual = vec![];
-    let mut cur_total = 0;
-    for c in springs.chars() {
-        if c == '#' {
-            cur_total += 1;
-        } else if cur_total > 0 {
-            actual.push(cur_total);
-            cur_total = 0;
-        }
-    }
-    if cur_total > 0 {
-        actual.push(cur_total);
-    }
-    actual
-}
-
-fn is_valid(line: &str) -> bool {
-    let split = line.split(' ').collect::<Vec<_>>();
-    let springs = split[0];
-    let expected = split[1].split(',').map(|s| s.parse::<usize>().unwrap()).collect::<Vec<_>>();
-    expected == get_actual_groups(springs)
+    cache.insert((springs_pos, cur_group, inside_group_length), result);
+    result
 }
 
 fn main() {
@@ -93,16 +68,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_is_valid() {
-        let input = r#"#.#.### 1,1,3
-.#...#....###. 1,1,3
-.#.###.#.###### 1,3,1,6
-####.#...#... 4,1,1
-#....######..#####. 1,6,5
-.###.##....# 3,2,1"#;
-        for line in input.lines() {
-            assert!(is_valid(line));
-        }
+    fn example_basic() {
+        let input = "?.# 1,1";
+        assert_eq!(calc_combinations(input, false).into_iter().sum::<usize>(), 1);
+        assert_eq!(calc_combinations(input, true).into_iter().sum::<usize>(), 1);
     }
 
     #[test]
@@ -114,7 +83,7 @@ mod tests {
 
     #[test]
     fn example_simple2() {
-        let input = "###???????? 3,2,1";
+        let input = "?###???????? 3,2,1";
         assert_eq!(calc_combinations(input, false).into_iter().sum::<usize>(), 10);
         assert_eq!(calc_combinations(input, true).into_iter().sum::<usize>(), 506250);
     }
