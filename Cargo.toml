@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 itertools = "0.12"
 nom = "7"
+rayon = "1"
 strum = { version = "0.25", features = ["derive"] }
